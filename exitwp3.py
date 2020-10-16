@@ -141,9 +141,9 @@ def parse_wp_xml(file):
                 try:
                     result = (i.find(q, ns) or i.find(tag) or i.find(ns[namespace] + tag)).text.strip()
                 except AttributeError:
-                    result = 'No Content Found'
-                    if empty:
-                        result = ''
+                    result = ''
+                    # if empty:
+                    #     result = ''
                 if unicode_wrap:
                     result = str(result)
                 return result
@@ -170,6 +170,7 @@ def parse_wp_xml(file):
                 'link': gi('link'),
                 'author': gi('dc:creator'),
                 'date': gi('wp:post_date_gmt'),
+                'description': gi('description'),
                 'slug': gi('wp:post_name'),
                 'status': gi('wp:status'),
                 'type': gi('wp:post_type'),
@@ -321,6 +322,7 @@ def write_gatsby(data, target_format):
             'link': i['link'],
             'author': i['author'],
             'date': date,
+            'description': i['description'],
             'slug': i['slug'],
             'wordpress_id': int(i['wp_id']),
             'comments': i['comments'],
@@ -362,25 +364,27 @@ def write_gatsby(data, target_format):
                 outpath = get_attachment_path(img, i['uid'])
                 relpath = '..'+ outpath.replace(blog_dir,'').replace('\\','/')
                 if 'flickr.com' in fullurl:
-                    print(f'Skipping Flickr url: {fullurl}')
+                    # Convert Flickr "farm?.static..." url to downloadable url
+                    downurl = re.sub('(farm\d.static.)', 'live.static', fullurl)
                 else:
-                    sys.stdout.write(f"Downloading image: {fullurl} => {outpath}")
+                    downurl = fullurl
+                sys.stdout.write(f"Downloading image: {downurl} => {outpath}")
+                sys.stdout.flush()
+                try:
+                    urlretrieve(downurl, outpath)
+                except:
+                    print('\nUnable to download ' + downurl)
+                    print('Error: ', sys.exc_info()[0])
+                    raise
+                else:
+                    sys.stdout.write("...replace link...")
                     sys.stdout.flush()
                     try:
-                        urlretrieve(fullurl, outpath)
-                    except:
-                        print('\nUnable to download ' + fullurl)
-                        print('Error: ', sys.exc_info()[0])
-                        raise
+                        i['body'] = i['body'].replace(fullurl, relpath)
+                    except Exception as e:
+                        print(e)
                     else:
-                        sys.stdout.write("...replace link...")
-                        sys.stdout.flush()
-                        try:
-                            i['body'] = i['body'].replace(fullurl, relpath)
-                        except Exception as e:
-                            print(e)
-                        else:
-                            print("ok.")
+                        print("ok.")
 
 
         if out is not None:
