@@ -1,8 +1,8 @@
 ##################
-ExitWP3 for Gatsby
+ExitWP3: Python 3 Port of Exitwp
 ##################
 
-This is a port of Thomas Frössman's ExitWP tool (for Jekyll) with modifications for Python 3
+This is a python 3 port of Thomas Frössman's ExitWP tool (for Jekyll) with modifications for Python 3
 
 Exitwp is tool for making migration from one or more wordpress blogs to a markdown format for use in a static site generator like Gatsby.
 
@@ -13,7 +13,7 @@ The latest version of these docs should always be available at https://github.co
 
 Getting started
 ===============
- * `Download <https://github.com/gavchan/exitwp3/zipball/master>`_ or clone using ``git clone https://github.com/thomasf/exitwp.git``
+ * `Download <https://github.com/gavchan/exitwp3/zipball/master>`_ or clone using ``git clone https://github.com/gavchan/exitwp3``
  * Export one or more wordpress blogs using the wordpress exporter under tools/export in wordpress admin.
  * Put all wordpress xml files in the ``wordpress-xml`` directory
  * Special note for Wordpress 3.1, you need to add a missing namespace in rss tag : ``xmlns:atom="http://www.w3.org/2005/Atom"``
@@ -22,9 +22,9 @@ Getting started
  * You should now have all the blogs converted into separate directories under the ``build`` directory
 
 
-##############################
-Original Exitwp Using Python 2
-##############################
+##########################
+Original Exitwp (Python 2)
+##########################
 
  * For the original exitwp (Python 2): ``python exitwp.py``
 
