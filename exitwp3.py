@@ -38,6 +38,8 @@ with open('config.yaml') as f:
 wp_exports = config['wp_exports']
 build_dir = config['build_dir']
 download_images = config['download_images']
+use_hierarchical_folders = config['use_hierarchical_folders']
+replace_existing = config['replace_existing']
 target_format = config['target_format']
 taxonomy_filter = set(config['taxonomies']['filter'])
 taxonomy_entry_filter = config['taxonomies']['entry_filter']
@@ -266,7 +268,7 @@ def write_gatsby(data, target_format):
         filename_parts.append(target_format)
         return ''.join(filename_parts)
 
-    def get_attachment_path(src, dir, dir_prefix='images'):
+    def get_attachment_path(src, dir, dir_prefix='assets'):
         try:
             files = attachments[dir]
         except KeyError:
@@ -287,8 +289,13 @@ def write_gatsby(data, target_format):
                 file_infix = file_infix + 1
             files[src] = filename = maybe_filename
 
-        target_dir = os.path.normpath(blog_dir + '/' + dir_prefix + '/' + dir)
-        target_file = os.path.normpath(target_dir + '/' + filename)
+        if use_hierarchical_folders:
+            target_dir = os.path.normpath(blog_dir + '/' + dir_prefix + '/' + dir)
+            target_file = os.path.normpath(target_dir + '/' + filename)
+        else:
+            # Instead of hierarchical structure, use flat structure to save
+            target_dir = os.path.normpath(blog_dir + '/' + dir_prefix)
+            target_file = os.path.normpath(target_dir + '/' + dir + '_' + filename)
 
         if (not os.path.exists(target_dir)):
             os.makedirs(target_dir)
@@ -319,13 +326,13 @@ def write_gatsby(data, target_format):
             print('Wrong date in', i['title'])
         yaml_header = {
             'title': i['title'],
-            'link': i['link'],
-            'author': i['author'],
+            #'link': i['link'],
+            #'author': i['author'],
             'date': date,
             'description': i['description'],
-            'slug': i['slug'],
-            'wordpress_id': int(i['wp_id']),
-            'comments': i['comments'],
+            'slug': '/'+i['slug'],
+            #'wordpress_id': int(i['wp_id']),
+            #'comments': i['comments'],
         }
         if len(i['excerpt']) > 0:
             yaml_header['excerpt'] = i['excerpt']
@@ -336,7 +343,7 @@ def write_gatsby(data, target_format):
             i['uid'] = get_item_uid(i, date_prefix=True)
             fn = get_item_path(i, dir='_posts')
             out = open_file(fn)
-            yaml_header['layout'] = 'post'
+            yaml_header['template'] = 'blog-post'
         elif i['type'] == 'page':
             i['uid'] = get_item_uid(i)
             # Chase down parent path, if any
@@ -351,41 +358,63 @@ def write_gatsby(data, target_format):
                     break
             fn = get_item_path(i, parentpath)
             out = open_file(fn)
-            yaml_header['layout'] = 'page'
+            yaml_header['template'] = 'page'
         elif i['type'] in item_type_filter:
             pass
         else:
             print('Unknown item type :: ' + i['type'])
             
-            
+        # Set featured image if images exists
+        if i['img_srcs']:
+            featured_image_path =  urljoin(data['header']['link'], str(i['img_srcs'][0]))
+        else:
+            featured_image_path = ''
         if download_images:
+            counter = 0
             for img in i['img_srcs']:
                 fullurl = urljoin(data['header']['link'], str(img))
                 outpath = get_attachment_path(img, i['uid'])
-                relpath = '..'+ outpath.replace(blog_dir,'').replace('\\','/')
+                relpath = outpath.replace(blog_dir,'').replace('\\','/')
+
                 if 'flickr.com' in fullurl:
                     # Convert Flickr "farm?.static..." url to downloadable url
                     downurl = re.sub('(farm\d.static.)', 'live.static', fullurl)
+                    # Specify large size (1064)
+                    downurl = re.sub('(.jpg)', '_b.jpg', downurl)
                 else:
                     downurl = fullurl
-                sys.stdout.write(f"Downloading image: {downurl} => {outpath}")
-                sys.stdout.flush()
-                try:
-                    urlretrieve(downurl, outpath)
-                except:
-                    print('\nUnable to download ' + downurl)
-                    print('Error: ', sys.exc_info()[0])
-                    raise
-                else:
-                    sys.stdout.write("...replace link...")
-                    sys.stdout.flush()
-                    try:
-                        i['body'] = i['body'].replace(fullurl, relpath)
-                    except Exception as e:
-                        print(e)
+                
+                try_download = True
+                if os.path.isfile(outpath):
+                    if replace_existing: 
+                        sys.stdout.write(f"Replacing image: {downurl} => {outpath}")
+                        sys.stdout.flush()
                     else:
-                        print("ok.")
-
+                        sys.stdout.write(f"Skip existing: {outpath}\n")
+                        sys.stdout.flush()
+                        i['body'] = i['body'].replace(fullurl, relpath)
+                        try_download = False
+                if try_download:
+                    try:
+                        sys.stdout.write(f"Downloading image")
+                        urlretrieve(downurl, outpath)
+                    except:
+                        print('\nUnable to download ' + downurl)
+                        print('Error: ', sys.exc_info()[0])
+                        raise
+                    else:
+                        sys.stdout.write("...replace link...")
+                        sys.stdout.flush()
+                        try:
+                            i['body'] = i['body'].replace(fullurl, relpath)
+                        except Exception as e:
+                            print(e)
+                        else:
+                            print("ok.")
+                if counter == 0:
+                    featured_image_path = relpath
+                counter += 1
+        yaml_header['featuredImage'] = featured_image_path
 
         if out is not None:
             def toyaml(data):
